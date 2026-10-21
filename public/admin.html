@@ -8,14 +8,31 @@
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f1f5f9; padding: 25px; margin: 0; }
     .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     h2 { margin-top: 0; color: #1e293b; }
-    .btn { padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; border: 1px solid transparent; font-size: 0.95rem; }
+    h3 { margin-top: 0; margin-bottom: 15px; color: #334155; }
+    
+    .btn { padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; border: 1px solid transparent; font-size: 0.95rem; transition: background 0.2s; }
+    .btn:active { transform: scale(0.98); }
     .btn-blue { background: #2563eb; color: white; }
+    .btn-blue:hover { background: #1d4ed8; }
     .btn-green { background: #16a34a; color: white; }
+    .btn-green:hover { background: #15803d; }
     .btn-red { background: #dc2626; color: white; }
+    .btn-red:hover { background: #b91c1c; }
     .btn-amber { background: #d97706; color: white; }
-    .q-list { list-style: none; padding: 0; margin-top: 15px; }
-    .q-item { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-    .q-item.active { border-color: #2563eb; background: #eff6ff; }
+    
+    /* 題目庫捲動設計 */
+    .q-list-container {
+      max-height: 450px; /* 限制最高高度，超出時內部捲動 */
+      overflow-y: auto;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fafc;
+    }
+    .q-list { list-style: none; padding: 0; margin: 0; }
+    .q-item { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; background: white; transition: all 0.2s; }
+    .q-item.active { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 10px rgba(37,99,235,0.15); border-left: 5px solid #2563eb; }
+    .q-item:last-child { margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -32,20 +49,37 @@
   <!-- 2. 當前控制 -->
   <div class="card">
     <h3>2. 流程控制器</h3>
-    <p style="margin-bottom: 15px;">全場狀態：<b id="statusLabel" style="color:#2563eb;">IDLE</b> | 連線人數：<b id="activeUserCount">0</b></p>
-    <div style="display:flex; gap:10px;">
-      <button class="btn btn-green" onclick="sendCommand('OPEN_ANSWER')">1. 開放作答</button>
-      <button class="btn btn-red" onclick="sendCommand('START_COUNTDOWN')">2. 最後5秒倒數 (自動公佈)</button>
-      <button class="btn btn-amber" onclick="sendCommand('SHOW_LEADERBOARD')">3. 顯示大螢幕排行榜</button>
-      <a href="/api/export" class="btn btn-blue" style="text-decoration:none; display:inline-block;">導出結果 Excel/CSV</a>
-      <button class="btn" style="background:#64748b; color:white; margin-left:auto;" onclick="if(confirm('確認重置整場遊戲？')) sendCommand('RESET_GAME')">重置遊戲</button>
+    <p style="margin-bottom: 15px; font-size: 1.1rem;">
+      全場狀態：<b id="statusLabel" style="color:#2563eb;">IDLE</b> | 
+      目前連線人數：<b id="activeUserCount" style="color:#16a34a;">0</b>
+    </p>
+    <div style="display:flex; gap:10px; flex-wrap: wrap;">
+      <button class="btn btn-green" onclick="sendCommand('OPEN_ANSWER')">▶️ 1. 開放作答</button>
+      <button class="btn btn-red" onclick="sendCommand('START_COUNTDOWN')">⏱️ 2. 最後5秒倒數 (自動公佈)</button>
+      <button class="btn btn-amber" onclick="sendCommand('SHOW_LEADERBOARD')">🏆 3. 顯示排行榜</button>
+      <a href="/api/export" class="btn btn-blue" style="text-decoration:none; display:inline-block;">📊 導出結果 Excel/CSV</a>
+      <button class="btn" style="background:#64748b; color:white; margin-left:auto;" onclick="if(confirm('警告：確認重置整場遊戲？所有分數將清零！')) sendCommand('RESET_GAME')">重置遊戲</button>
     </div>
   </div>
 
   <!-- 3. 題目清單 -->
   <div class="card">
-    <h3>3. 題目導覽 (點擊即可載入至大螢幕)</h3>
-    <ul id="questionListView" class="q-list"></ul>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3 style="margin: 0;">3. 題目導覽庫</h3>
+      
+      <!-- 新增：上一題 / 下一題 按鈕 -->
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-blue" style="background:#475569;" onclick="prevQuestion()">⬅️ 上一題</button>
+        <button class="btn btn-blue" style="background:#475569;" onclick="nextQuestion()">下一題 ➡️</button>
+      </div>
+    </div>
+
+    <!-- 增加：獨立捲動容器 -->
+    <div class="q-list-container" id="qListContainer">
+      <ul id="questionListView" class="q-list">
+        <li style="text-align:center; padding: 20px; color: #94a3b8;">請先由上方導入 CSV 題庫</li>
+      </ul>
+    </div>
   </div>
 
   <script>
@@ -53,23 +87,58 @@
     let questions = [];
     let currentIdx = -1;
 
+    // 接收狀態更新
     socket.on('state_update', (data) => {
       document.getElementById('statusLabel').innerText = data.state;
       document.getElementById('activeUserCount').innerText = data.activeCount;
     });
 
+    // 發送一般指令
     function sendCommand(action, index = null) {
       socket.emit('admin_command', { action, index });
     }
 
+    // 點擊或使用上一題/下一題按鈕時，選中題目
     function selectQuestion(idx) {
+      if (idx < 0 || idx >= questions.length) return;
       currentIdx = idx;
+      
+      // 更新介面 Highlight
       document.querySelectorAll('.q-item').forEach((el, i) => {
-        el.classList.toggle('active', i === idx);
+        if (i === idx) {
+          el.classList.add('active');
+          // 自動將選中的題目捲動至可見範圍內
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          el.classList.remove('active');
+        }
       });
+      
+      // 告訴伺服器切換至這題 (大螢幕會顯示，手機端會鎖定按鍵)
       sendCommand('PREVIEW_QUESTION', idx);
     }
 
+    // 上一題邏輯
+    function prevQuestion() {
+      if (questions.length === 0) return alert('請先導入題目！');
+      if (currentIdx > 0) {
+        selectQuestion(currentIdx - 1);
+      } else {
+        alert('這已經是第一題了！');
+      }
+    }
+
+    // 下一題邏輯
+    function nextQuestion() {
+      if (questions.length === 0) return alert('請先導入題目！');
+      if (currentIdx < questions.length - 1) {
+        selectQuestion(currentIdx + 1);
+      } else {
+        alert('這已經是最後一題了！');
+      }
+    }
+
+    // 處理 CSV 匯入
     function importCSV() {
       const fileInput = document.getElementById('csvFile');
       if (!fileInput.files.length) return alert('請先選擇 CSV 檔案');
@@ -79,7 +148,6 @@
         const text = e.target.result;
         const lines = text.split('\n').filter(l => l.trim().length > 0);
         
-        // 忽略第一行 header: 題目,A,B,C,D,正確答案
         const parsed = [];
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',').map(s => s.replace(/(^"|"$)/g, '').trim());
@@ -95,6 +163,7 @@
         socket.emit('import_questions', parsed, (res) => {
           if (res.success) {
             questions = parsed;
+            currentIdx = -1; // 匯入後重置當前進度
             renderQuestionList();
             document.getElementById('loadStatus').innerText = `成功載入 ${res.count} 條題目！`;
           } else {
@@ -105,13 +174,17 @@
       reader.readAsText(fileInput.files[0]);
     }
 
+    // 渲染題目清單
     function renderQuestionList() {
       const list = document.getElementById('questionListView');
       list.innerHTML = questions.map((q, idx) => `
-        <li class="q-item ${idx === currentIdx ? 'active' : ''}">
-          <div>
-            <b>第 ${idx + 1} 題：${q.question}</b><br>
-            <small style="color:#64748b;">A: ${q.options.A} | B: ${q.options.B} | C: ${q.options.C} | D: ${q.options.D} (答案: ${q.correct})</small>
+        <li class="q-item ${idx === currentIdx ? 'active' : ''}" id="q_item_${idx}">
+          <div style="flex:1; padding-right:15px;">
+            <b style="font-size:1.1rem; color:#1e293b;">Q${idx + 1}. ${q.question}</b><br>
+            <small style="color:#64748b; line-height:1.6; display:inline-block; margin-top:5px;">
+              A: ${q.options.A} | B: ${q.options.B} | C: ${q.options.C} | D: ${q.options.D} 
+              <br><strong style="color:#16a34a;">正確答案: ${q.correct}</strong>
+            </small>
           </div>
           <button class="btn btn-blue" onclick="selectQuestion(${idx})">投屏此題</button>
         </li>

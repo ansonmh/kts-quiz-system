@@ -10,12 +10,10 @@ const io = new Server(server, { cors: { origin: '*' } });
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 遊戲狀態機: IDLE -> PREVIEW -> OPEN -> COUNTDOWN -> REVEAL -> LEADERBOARD
 const GameState = {
   IDLE: 'IDLE',
   PREVIEW: 'PREVIEW',
   OPEN: 'OPEN',
-  COUNTDOWN: 'COUNTDOWN',
   REVEAL: 'REVEAL',
   LEADERBOARD: 'LEADERBOARD'
 };
@@ -24,15 +22,13 @@ let currentState = GameState.IDLE;
 let questions = [];
 let currentQIndex = -1;
 let questionStartTime = 0;
+let questionDuration = 20; // 預設 20 秒
 let countdownTimer = null;
+let remainingSeconds = 20;
 
-// 資料存儲
-// participants: { [userId]: { id, name, gradYear, tableNo, score, totalTimeSpent, answers: {} } }
 let participants = {};
-// currentAnswers: { [userId]: { choice: 'A', timestamp: 12345678 } }
 let currentAnswers = {};
 
-// 廣播最新全域遊戲狀態
 function broadcastState() {
   const currentQ = questions[currentQIndex] || null;
   const sanitizedQ = currentQ ? {
@@ -46,11 +42,12 @@ function broadcastState() {
     state: currentState,
     currentQuestion: sanitizedQ,
     activeCount: Object.keys(participants).length,
-    answeredCount: Object.keys(currentAnswers).length
+    answeredCount: Object.keys(currentAnswers).length,
+    duration: questionDuration,
+    remainingSeconds: remainingSeconds
   });
 }
 
-// 計算當前題目的選擇分佈 (A/B/C/D)
 function getDistribution() {
   const counts = { A: 0, B: 0, C: 0, D: 0 };
   Object.values(currentAnswers).forEach(ans => {
@@ -59,7 +56,6 @@ function getDistribution() {
   return counts;
 }
 
-// 結算當前題目分數
 function evaluateCurrentQuestion() {
   const q = questions[currentQIndex];
   if (!q) return;
@@ -69,32 +65,35 @@ function evaluateCurrentQuestion() {
     if (!user) return;
 
     const isCorrect = ans.choice.trim().toUpperCase() === q.correct.trim().toUpperCase();
-    const timeSpent = Math.max(0, ans.timestamp - questionStartTime);
+    const timeSpentMs = Math.max(0, ans.timestamp - questionStartTime);
+    const timeSpentSec = Math.min(questionDuration, timeSpentMs / 1000);
+
+    let roundScore = 0;
+    if (isCorrect) {
+      // 50分底分 + 最高50分競速獎勵
+      const speedBonus = Math.round(50 * (1 - (timeSpentSec / questionDuration)));
+      roundScore = 50 + Math.max(0, speedBonus);
+      user.score += roundScore;
+      user.totalTimeSpent += timeSpentMs;
+    }
 
     user.answers[currentQIndex] = {
       choice: ans.choice,
       correct: isCorrect,
-      timeSpent: timeSpent
+      timeSpentSec: timeSpentSec.toFixed(2),
+      roundScore: roundScore
     };
-
-    if (isCorrect) {
-      user.score += 10;
-      user.totalTimeSpent += timeSpent;
-    }
   });
 }
 
-// 產生個人前十名與枱號排行榜
 function getLeaderboardData() {
   const list = Object.values(participants);
 
-  // 個人排行榜（優先看分數，平手看總耗時（毫秒，越低越好））
   const individualRank = [...list].sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     return a.totalTimeSpent - b.totalTimeSpent;
   }).slice(0, 10);
 
-  // 枱號平均分排行榜
   const tableStats = {};
   list.forEach(p => {
     if (!tableStats[p.tableNo]) tableStats[p.tableNo] = { totalScore: 0, members: 0 };
@@ -111,8 +110,21 @@ function getLeaderboardData() {
   return { individualRank, tableRank };
 }
 
+function endQuestion() {
+  clearInterval(countdownTimer);
+  countdownTimer = null;
+  currentState = GameState.REVEAL;
+  evaluateCurrentQuestion();
+  const q = questions[currentQIndex];
+  io.emit('reveal_result', {
+    correct: q.correct,
+    distribution: getDistribution(),
+    answers: currentAnswers
+  });
+  broadcastState();
+}
+
 io.on('connection', (socket) => {
-  // 1. 參加者登記 / 恢復連線
   socket.on('register', (data, callback) => {
     const { userId, name, gradYear, tableNo } = data;
     if (!userId || !name || !tableNo) {
@@ -137,11 +149,11 @@ io.on('connection', (socket) => {
     broadcastState();
   });
 
-  // 2. 參加者提交答案
   socket.on('submit_answer', (choice) => {
-    if (currentState !== GameState.OPEN && currentState !== GameState.COUNTDOWN) return;
+    if (currentState !== GameState.OPEN) return;
     if (!socket.userId || !participants[socket.userId]) return;
 
+    // 記錄精確作答時間戳
     currentAnswers[socket.userId] = {
       choice,
       timestamp: Date.now()
@@ -153,10 +165,10 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 3. 後台操作指令
   socket.on('admin_command', (cmd) => {
     switch (cmd.action) {
       case 'PREVIEW_QUESTION':
+        clearInterval(countdownTimer);
         if (cmd.index >= 0 && cmd.index < questions.length) {
           currentQIndex = cmd.index;
           currentState = GameState.PREVIEW;
@@ -165,47 +177,44 @@ io.on('connection', (socket) => {
         }
         break;
 
-      case 'OPEN_ANSWER':
-        if (currentState === GameState.PREVIEW) {
+      case 'START_TIMER':
+        if (currentState === GameState.PREVIEW || currentState === GameState.OPEN) {
           currentState = GameState.OPEN;
+          questionDuration = cmd.duration || 20;
+          remainingSeconds = questionDuration;
           questionStartTime = Date.now();
-          broadcastState();
-        }
-        break;
+          currentAnswers = {};
 
-      case 'START_COUNTDOWN':
-        if (currentState === GameState.OPEN) {
-          currentState = GameState.COUNTDOWN;
           broadcastState();
-          io.emit('start_countdown_timer', 5);
+          io.emit('timer_start', { duration: questionDuration });
 
-          let counter = 5;
           clearInterval(countdownTimer);
           countdownTimer = setInterval(() => {
-            counter--;
-            if (counter <= 0) {
-              clearInterval(countdownTimer);
-              currentState = GameState.REVEAL;
-              evaluateCurrentQuestion();
-              const q = questions[currentQIndex];
-              io.emit('reveal_result', {
-                correct: q.correct,
-                distribution: getDistribution(),
-                answers: currentAnswers
-              });
-              broadcastState();
+            remainingSeconds--;
+            io.emit('timer_tick', { remaining: remainingSeconds });
+
+            if (remainingSeconds <= 0) {
+              endQuestion();
             }
           }, 1000);
         }
         break;
 
+      case 'FORCE_STOP':
+        if (currentState === GameState.OPEN) {
+          endQuestion();
+        }
+        break;
+
       case 'SHOW_LEADERBOARD':
+        clearInterval(countdownTimer);
         currentState = GameState.LEADERBOARD;
         io.emit('show_leaderboard_data', getLeaderboardData());
         broadcastState();
         break;
 
       case 'RESET_GAME':
+        clearInterval(countdownTimer);
         currentState = GameState.IDLE;
         currentQIndex = -1;
         currentAnswers = {};
@@ -219,7 +228,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 4. 後台匯入題目
   socket.on('import_questions', (list, callback) => {
     if (!Array.isArray(list) || list.length === 0) {
       return callback({ success: false, message: '題目格式錯誤' });
@@ -232,18 +240,16 @@ io.on('connection', (socket) => {
     callback({ success: true, count: questions.length });
   });
 
-  // 斷線時更新連線人數
   socket.on('disconnect', () => {
     broadcastState();
   });
 });
 
-// CSV 導出端點
 app.get('/api/export', (req, res) => {
   const users = Object.values(participants);
   users.sort((a, b) => b.score - a.score || a.totalTimeSpent - b.totalTimeSpent);
 
-  let csv = '\uFEFF排名,姓名,畢業年份,枱號,總得分,總作答時間(秒)\n';
+  let csv = '\uFEFF排名,姓名,畢業年份,枱號,總得分,總作答耗時(秒)\n';
   users.forEach((u, idx) => {
     csv += `${idx + 1},"${u.name}","${u.gradYear}","${u.tableNo}",${u.score},${(u.totalTimeSpent / 1000).toFixed(2)}\n`;
   });
@@ -255,5 +261,5 @@ app.get('/api/export', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`KTS 65th Gala Quiz Server running on http://localhost:${PORT}`);
+  console.log(`KTS 65th Gala Quiz Server running on port ${PORT}`);
 });

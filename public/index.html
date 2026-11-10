@@ -22,24 +22,24 @@
     header p { font-size: 0.8rem; opacity: 0.8; }
     .container { flex: 1; padding: 16px; display: flex; flex-direction: column; justify-content: center; }
     
-    /* 登入表單 */
     .form-box { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
     .input-group { margin-bottom: 14px; }
     label { display: block; font-size: 0.85rem; margin-bottom: 6px; color: #cbd5e1; }
     input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 1rem; }
     button.btn-primary { width: 100%; padding: 14px; background: var(--gold); border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; color: #081220; }
 
-    /* 答題區域 - 新增題目與選項文字排版 */
-    .status-bar { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 15px; background: var(--card); padding: 10px 14px; border-radius: 8px; }
+    .status-bar { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 10px; background: var(--card); padding: 10px 14px; border-radius: 8px; }
     .wait-box { text-align: center; padding: 40px 10px; }
     .wait-box h2 { color: var(--gold); margin-bottom: 10px; }
     
+    /* 計時進度條 */
+    .timer-container { width: 100%; background: #1e293b; border-radius: 20px; overflow: hidden; height: 12px; margin-bottom: 14px; display: none; }
+    .timer-bar { height: 100%; background: linear-gradient(90deg, #27ae60, #f2c94c, #eb5757); width: 100%; transition: width 1s linear; }
+
     .question-display { background: rgba(255,255,255,0.08); padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 1.15rem; font-weight: bold; line-height: 1.4; color: var(--gold); border-left: 4px solid var(--gold); }
-    
     .choice-stack { display: flex; flex-direction: column; gap: 12px; }
     .choice-btn { border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; color: white; display: flex; align-items: center; padding: 12px 15px; cursor: pointer; transition: transform 0.1s; text-align: left; line-height: 1.3; }
     .choice-btn:active { transform: scale(0.98); }
-    
     .opt-label { font-size: 1.4rem; margin-right: 15px; background: rgba(0,0,0,0.2); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; flex-shrink: 0; }
     .opt-text { flex: 1; }
 
@@ -47,10 +47,9 @@
     .btn-B { background: var(--btn-b); }
     .btn-C { background: var(--btn-c); }
     .btn-D { background: var(--btn-d); }
-    .choice-btn.selected { outline: 4px solid #fff; box-shadow: 0 0 15px rgba(255,255,255,0.5); transform: scale(1.02); }
-    .choice-btn:disabled { opacity: 0.6; filter: grayscale(40%); cursor: not-allowed; transform: none; }
+    .choice-btn.selected { outline: 4px solid #fff; box-shadow: 0 0 15px rgba(255,255,255,0.8); transform: scale(1.02); }
+    .choice-btn:disabled { opacity: 0.5; filter: grayscale(40%); }
 
-    /* 結果回饋 */
     .feedback-box { text-align: center; padding: 25px; border-radius: 12px; background: var(--card); }
     .feedback-box.correct { border: 2px solid var(--btn-d); }
     .feedback-box.wrong { border: 2px solid var(--btn-a); }
@@ -63,34 +62,26 @@
   </header>
 
   <div class="container">
-    <!-- 1. 登記區 -->
     <div id="regView" class="form-box">
       <h3 style="margin-bottom: 15px; text-align:center;">參加者登記</h3>
-      <div class="input-group">
-        <label>你的姓名</label>
-        <input type="text" id="name" placeholder="如：陳大文">
-      </div>
-      <div class="input-group">
-        <label>畢業年份</label>
-        <input type="number" id="gradYear" placeholder="如：1998">
-      </div>
-      <div class="input-group">
-        <label>當前枱號</label>
-        <input type="text" id="tableNo" placeholder="如：12">
-      </div>
+      <div class="input-group"><label>你的姓名</label><input type="text" id="name" placeholder="如：陳大文"></div>
+      <div class="input-group"><label>畢業年份</label><input type="number" id="gradYear" placeholder="如：1998"></div>
+      <div class="input-group"><label>當前枱號</label><input type="text" id="tableNo" placeholder="如：12"></div>
       <button class="btn-primary" onclick="handleRegister()">進入遊戲</button>
     </div>
 
-    <!-- 2. 遊戲主畫面 -->
     <div id="gameView" style="display:none; flex-direction:column; flex:1;">
       <div class="status-bar">
         <span id="userInfo">--</span>
-        <span id="userScore">得分：0 分</span>
+        <span id="userScore" style="color:var(--gold); font-weight:bold;">總分：0</span>
       </div>
 
-      <div id="contentArea" style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-        <!-- 動態置換內容 -->
+      <!-- 計時條 -->
+      <div class="timer-container" id="timerBox">
+        <div class="timer-bar" id="timerBar"></div>
       </div>
+
+      <div id="contentArea" style="flex:1; display:flex; flex-direction:column; justify-content:center;"></div>
     </div>
   </div>
 
@@ -98,8 +89,10 @@
     const socket = io();
     let currentUser = null;
     let selectedChoice = null;
+    let totalDuration = 20;
+    let answerTimeTaken = null;
+    let questionStartTimestamp = null;
 
-    // 檢查本地登入狀態
     window.onload = () => {
       const saved = localStorage.getItem('kts_user');
       if (saved) {
@@ -135,93 +128,110 @@
 
     function showGame() {
       document.getElementById('regView').style.display = 'none';
-      const gameView = document.getElementById('gameView');
-      gameView.style.display = 'flex';
+      document.getElementById('gameView').style.display = 'flex';
       document.getElementById('userInfo').innerText = `${currentUser.name} (${currentUser.tableNo}號枱)`;
-      document.getElementById('userScore').innerText = `得分：${currentUser.score} 分`;
+      document.getElementById('userScore').innerText = `總分：${currentUser.score} 分`;
     }
 
     function selectOption(opt) {
       selectedChoice = opt;
+      answerTimeTaken = ((Date.now() - questionStartTimestamp) / 1000).toFixed(2);
       if (navigator.vibrate) navigator.vibrate(40);
       document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
       document.getElementById(`btn_${opt}`).classList.add('selected');
       socket.emit('submit_answer', opt);
+
+      const tip = document.getElementById('speedTip');
+      if (tip) tip.innerText = `⚡ 已選 ${opt}！作答耗時：${answerTimeTaken} 秒（越快分越高）`;
     }
 
-    // 監聽伺服器廣播
     socket.on('state_update', (data) => {
       const area = document.getElementById('contentArea');
-      if (document.getElementById('userScore') && currentUser) {
-        document.getElementById('userScore').innerText = `得分：${currentUser.score} 分`;
-      }
+      const timerBox = document.getElementById('timerBox');
 
       if (data.state === 'IDLE') {
+        timerBox.style.display = 'none';
         area.innerHTML = `<div class="wait-box"><h2>即將開始</h2><p>請留意大螢幕，遊戲即將展開！</p></div>`;
-      
-      } else if (data.state === 'PREVIEW' || data.state === 'OPEN' || data.state === 'COUNTDOWN') {
-        const q = data.currentQuestion;
-        const isPreview = (data.state === 'PREVIEW');
-        
-        // 渲染題目與選項文字
-        let html = `
-          <div class="question-display">
-            Q${q.index}. ${q.question}
-          </div>
-          <div class="choice-stack">
-        `;
-        
-        ['A', 'B', 'C', 'D'].forEach(opt => {
-          html += `
-            <button id="btn_${opt}" class="choice-btn btn-${opt}" onclick="selectOption('${opt}')" ${isPreview ? 'disabled' : ''}>
-              <span class="opt-label">${opt}</span>
-              <span class="opt-text">${q.options[opt]}</span>
-            </button>
-          `;
-        });
-        
-        html += `</div>`;
-        
-        if (isPreview) {
-          selectedChoice = null; // 預覽階段重置選擇
-          html += `<p style="text-align:center; margin-top:15px; font-size:1rem; color:var(--gold);">準備中... 即將開放作答</p>`;
-        } else {
-          html += `<p style="text-align:center; margin-top:15px; font-size:0.85rem; opacity:0.8;">點擊按鈕即可作答，倒數前可隨時更改</p>`;
-        }
-
-        area.innerHTML = html;
-        
-        // 恢復已選選項（防斷線或狀態更新）
-        if (selectedChoice && !isPreview) {
-          document.getElementById(`btn_${selectedChoice}`).classList.add('selected');
-        }
-
+      } else if (data.state === 'PREVIEW') {
+        timerBox.style.display = 'none';
+        selectedChoice = null;
+        answerTimeTaken = null;
+        renderQuestionUI(data.currentQuestion, true);
       }
     });
 
-    socket.on('start_countdown_timer', (sec) => {
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    socket.on('timer_start', (data) => {
+      totalDuration = data.duration;
+      questionStartTimestamp = Date.now();
+      const timerBox = document.getElementById('timerBox');
+      const timerBar = document.getElementById('timerBar');
+      timerBox.style.display = 'block';
+      timerBar.style.width = '100%';
+
+      // 啟用所有按鈕
+      document.querySelectorAll('.choice-btn').forEach(b => b.disabled = false);
+      const tip = document.getElementById('speedTip');
+      if (tip) tip.innerText = `⏱️ 限時 ${totalDuration} 秒，越快回答分數越高！`;
     });
+
+    socket.on('timer_tick', (data) => {
+      const timerBar = document.getElementById('timerBar');
+      const pct = Math.max(0, (data.remaining / totalDuration) * 100);
+      timerBar.style.width = pct + '%';
+      if (data.remaining <= 5 && navigator.vibrate) {
+        navigator.vibrate(80);
+      }
+    });
+
+    function renderQuestionUI(q, isPreview) {
+      const area = document.getElementById('contentArea');
+      let html = `
+        <div class="question-display">Q${q.index}. ${q.question}</div>
+        <div class="choice-stack">
+      `;
+      ['A', 'B', 'C', 'D'].forEach(opt => {
+        html += `
+          <button id="btn_${opt}" class="choice-btn btn-${opt}" onclick="selectOption('${opt}')" ${isPreview ? 'disabled' : ''}>
+            <span class="opt-label">${opt}</span>
+            <span class="opt-text">${q.options[opt]}</span>
+          </button>
+        `;
+      });
+      html += `</div>`;
+      html += `<p id="speedTip" style="text-align:center; margin-top:15px; font-size:0.9rem; color:var(--gold); font-weight:bold;">${isPreview ? '題目展示中，準備搶答...' : '作答進行中！'}</p>`;
+      area.innerHTML = html;
+    }
 
     socket.on('reveal_result', (data) => {
+      document.getElementById('timerBox').style.display = 'none';
       const area = document.getElementById('contentArea');
       const isCorrect = selectedChoice === data.correct;
-      if (isCorrect) {
-        currentUser.score += 10;
-        document.getElementById('userScore').innerText = `得分：${currentUser.score} 分`;
+
+      let roundScore = 0;
+      let speedBonus = 0;
+
+      if (isCorrect && answerTimeTaken !== null) {
+        speedBonus = Math.round(50 * (1 - (Math.min(totalDuration, parseFloat(answerTimeTaken)) / totalDuration)));
+        roundScore = 50 + Math.max(0, speedBonus);
+        currentUser.score += roundScore;
+        document.getElementById('userScore').innerText = `總分：${currentUser.score} 分`;
       }
-      
+
       area.innerHTML = `
         <div class="feedback-box ${isCorrect ? 'correct' : 'wrong'}">
           <h2 style="font-size:2rem; margin-bottom:10px;">${isCorrect ? '🎉 答對了！' : '❌ 答錯了！'}</h2>
-          <p style="font-size:1.2rem;">正確答案是：<b style="color:var(--gold); font-size:1.5rem;">${data.correct}</b></p>
-          <p style="margin-top:12px; opacity:0.8;">你選擇了：${selectedChoice || '未作答'}</p>
-          <p style="margin-top:5px; font-weight:bold; color:${isCorrect ? '#27ae60':'#eb5757'};">${isCorrect ? '+10 分' : '+0 分'}</p>
+          <p style="font-size:1.2rem;">正確答案：<b style="color:var(--gold); font-size:1.6rem;">${data.correct}</b></p>
+          <p style="margin-top:10px; font-size:1rem; opacity:0.8;">你的選擇：${selectedChoice || '超時未選'} (耗時：${answerTimeTaken || '--'} 秒)</p>
+          <div style="margin-top:15px; font-size:1.5rem; font-weight:bold; color:${isCorrect ? '#27ae60':'#eb5757'};">
+            ${isCorrect ? `+${roundScore} 分` : '+0 分'}
+          </div>
+          ${isCorrect ? `<p style="font-size:0.85rem; color:#94a3b8; margin-top:4px;">(基礎50分 + 速度獎勵${speedBonus}分)</p>` : ''}
         </div>
       `;
     });
 
     socket.on('show_leaderboard_data', () => {
+      document.getElementById('timerBox').style.display = 'none';
       const area = document.getElementById('contentArea');
       area.innerHTML = `<div class="wait-box"><h2>🏆 答題結束</h2><p>請留意大螢幕公佈最終得獎名單！</p></div>`;
     });

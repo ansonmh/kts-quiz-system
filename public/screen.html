@@ -8,37 +8,38 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: "PingFang HK", "Microsoft JhengHei", sans-serif; }
     body { background: radial-gradient(circle at center, #152642 0%, #081220 100%); color: #fff; min-height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
     
-    header { height: 100px; display: flex; align-items: center; justify-content: space-between; padding: 0 50px; border-bottom: 2px solid #f2c94c; background: rgba(0,0,0,0.3); }
-    .logo-title h1 { font-size: 2.2rem; color: #f2c94c; letter-spacing: 2px; }
-    .live-stats { font-size: 1.3rem; background: rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 30px; }
+    header { height: 90px; display: flex; align-items: center; justify-content: space-between; padding: 0 50px; border-bottom: 2px solid #f2c94c; background: rgba(0,0,0,0.3); }
+    .logo-title h1 { font-size: 2.1rem; color: #f2c94c; letter-spacing: 2px; }
+    .live-stats { font-size: 1.3rem; background: rgba(255,255,255,0.1); padding: 8px 22px; border-radius: 30px; }
 
-    main { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px 60px; position: relative; }
+    main { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px 60px; position: relative; }
 
-    /* 題目面板 */
-    .question-box { width: 100%; max-width: 1200px; }
-    .q-title { font-size: 2.8rem; line-height: 1.4; margin-bottom: 40px; text-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-    .option-card { background: rgba(255,255,255,0.08); border-radius: 16px; padding: 25px 30px; font-size: 2rem; display: flex; align-items: center; border: 2px solid transparent; transition: all 0.3s; }
-    .option-tag { font-size: 2.2rem; font-weight: bold; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 20px; }
+    .question-box { width: 100%; max-width: 1250px; }
+    
+    .q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+    .q-title { font-size: 2.6rem; line-height: 1.35; flex: 1; text-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    
+    /* 圓形動態倒數錶 */
+    .timer-badge { width: 85px; height: 85px; border-radius: 50%; border: 6px solid #27ae60; display: flex; align-items: center; justify-content: center; font-size: 2.6rem; font-weight: 900; color: #27ae60; margin-left: 25px; flex-shrink: 0; transition: all 0.3s; }
+    .timer-badge.urgent { border-color: #eb5757; color: #eb5757; animation: pulse 0.8s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .option-card { background: rgba(255,255,255,0.08); border-radius: 16px; padding: 22px 28px; font-size: 1.9rem; display: flex; align-items: center; border: 2px solid transparent; transition: all 0.3s; }
+    .option-tag { font-size: 2rem; font-weight: bold; width: 55px; height: 55px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 20px; flex-shrink: 0; }
     .tag-A { background: #eb5757; }
     .tag-B { background: #2f80ed; }
     .tag-C { background: #f2994a; }
     .tag-D { background: #27ae60; }
-    .option-card.correct { border-color: #27ae60; background: rgba(39, 174, 96, 0.35); transform: scale(1.02); }
+    .option-card.correct { border-color: #27ae60; background: rgba(39, 174, 96, 0.4); transform: scale(1.02); }
 
-    /* 倒數動畫 */
-    .countdown-overlay { position: absolute; font-size: 14rem; font-weight: 900; color: #eb5757; text-shadow: 0 0 50px rgba(235,87,87,0.8); animation: pulse 1s infinite; display: none; }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
-
-    /* 結果分佈柱狀圖 */
-    .chart-box { margin-top: 30px; width: 100%; display: none; gap: 20px; }
+    .chart-box { margin-top: 25px; width: 100%; display: none; gap: 20px; }
     .chart-bar-wrap { flex: 1; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; height: 35px; position: relative; }
     .chart-bar-fill { height: 100%; background: #f2c94c; transition: width 0.8s ease-out; }
-    .chart-bar-text { position: absolute; left: 15px; top: 5px; font-size: 1.1rem; font-weight: bold; color: #fff; }
+    .chart-bar-text { position: absolute; left: 15px; top: 6px; font-size: 1.1rem; font-weight: bold; color: #fff; }
 
-    /* 排行榜面板 */
     .leaderboard-container { display: flex; width: 100%; max-width: 1300px; gap: 40px; }
-    .rank-col { flex: 1; background: rgba(21, 38, 66, 0.8); border-radius: 20px; padding: 25px; border: 1px solid rgba(242, 201, 76, 0.3); }
+    .rank-col { flex: 1; background: rgba(21, 38, 66, 0.85); border-radius: 20px; padding: 25px; border: 1px solid rgba(242, 201, 76, 0.3); }
     .rank-col h2 { color: #f2c94c; font-size: 1.8rem; margin-bottom: 20px; text-align: center; }
     .rank-table { width: 100%; border-collapse: collapse; font-size: 1.3rem; }
     .rank-table th { padding: 10px; color: #94a3b8; border-bottom: 1px solid #334155; }
@@ -53,22 +54,22 @@
     </div>
     <div class="live-stats">
       已連線校友：<span id="activeCount" style="color:#f2c94c; font-weight:bold;">0</span> 人 | 
-      已作答：<span id="answeredCount" style="color:#27ae60; font-weight:bold;">0</span>
+      已作答：<span id="answeredCount" style="color:#27ae60; font-weight:bold;">0</span> 人
     </div>
   </header>
 
   <main>
-    <div id="countdownBox" class="countdown-overlay">5</div>
-
-    <!-- 1. 待機/預備畫面 -->
     <div id="idleScreen" style="text-align:center;">
-      <h2 style="font-size:3.5rem; color:#f2c94c; margin-bottom:20px;">校慶問答大賽 即將開始</h2>
-      <p style="font-size:2rem; opacity:0.8;">請校友掃描枱面 QR Code，準備作答！</p>
+      <h2 style="font-size:3.5rem; color:#f2c94c; margin-bottom:20px;">校慶競速問答爭霸戰</h2>
+      <p style="font-size:2rem; opacity:0.8;">請掃描枱面 QR Code 登記入場，越早回答分數越高！</p>
     </div>
 
-    <!-- 2. 題目畫面 -->
     <div id="questionScreen" class="question-box" style="display:none;">
-      <div class="q-title" id="qTitle">題目加載中...</div>
+      <div class="q-header">
+        <div class="q-title" id="qTitle">題目加載中...</div>
+        <div class="timer-badge" id="timerBadge">20</div>
+      </div>
+
       <div class="options-grid">
         <div id="opt_A" class="option-card"><span class="option-tag tag-A">A</span><span id="optText_A">--</span></div>
         <div id="opt_B" class="option-card"><span class="option-tag tag-B">B</span><span id="optText_B">--</span></div>
@@ -76,7 +77,6 @@
         <div id="opt_D" class="option-card"><span class="option-tag tag-D">D</span><span id="optText_D">--</span></div>
       </div>
 
-      <!-- 答題人數柱狀圖 -->
       <div id="chartBox" class="chart-box">
         <div class="chart-bar-wrap"><div id="bar_A" class="chart-bar-fill" style="width:0%"></div><span class="chart-bar-text" id="text_A">A: 0%</span></div>
         <div class="chart-bar-wrap"><div id="bar_B" class="chart-bar-fill" style="width:0%"></div><span class="chart-bar-text" id="text_B">B: 0%</span></div>
@@ -85,7 +85,6 @@
       </div>
     </div>
 
-    <!-- 3. 排行榜畫面 -->
     <div id="leaderboardScreen" class="leaderboard-container" style="display:none;">
       <div class="rank-col">
         <h2>🏆 個人最強學霸 Top 10</h2>
@@ -115,7 +114,6 @@
         showScreen('idleScreen');
       } else if (data.state === 'PREVIEW' || data.state === 'OPEN') {
         showScreen('questionScreen');
-        document.getElementById('countdownBox').style.display = 'none';
         document.getElementById('chartBox').style.display = 'none';
         document.querySelectorAll('.option-card').forEach(c => c.classList.remove('correct'));
 
@@ -125,6 +123,28 @@
         document.getElementById('optText_B').innerText = q.options.B;
         document.getElementById('optText_C').innerText = q.options.C;
         document.getElementById('optText_D').innerText = q.options.D;
+
+        if (data.state === 'PREVIEW') {
+          const badge = document.getElementById('timerBadge');
+          badge.innerText = '預備';
+          badge.style.fontSize = '1.6rem';
+          badge.classList.remove('urgent');
+        }
+      }
+    });
+
+    socket.on('timer_start', (data) => {
+      const badge = document.getElementById('timerBadge');
+      badge.style.fontSize = '2.6rem';
+      badge.innerText = data.duration;
+      badge.classList.remove('urgent');
+    });
+
+    socket.on('timer_tick', (data) => {
+      const badge = document.getElementById('timerBadge');
+      badge.innerText = data.remaining;
+      if (data.remaining <= 5) {
+        badge.classList.add('urgent');
       }
     });
 
@@ -132,28 +152,8 @@
       document.getElementById('answeredCount').innerText = data.answeredCount;
     });
 
-    socket.on('start_countdown_timer', (sec) => {
-      const box = document.getElementById('countdownBox');
-      box.style.display = 'block';
-      let count = sec;
-      box.innerText = count;
-      const interval = setInterval(() => {
-        count--;
-        if (count > 0) {
-          box.innerText = count;
-        } else {
-          clearInterval(interval);
-          box.style.display = 'none';
-        }
-      }, 1000);
-    });
-
     socket.on('reveal_result', (data) => {
-      document.getElementById('countdownBox').style.display = 'none';
-      // 高亮正確答案
       document.getElementById(`opt_${data.correct}`).classList.add('correct');
-
-      // 呈現比例柱狀圖
       const chartBox = document.getElementById('chartBox');
       chartBox.style.display = 'flex';
       const total = Object.values(data.distribution).reduce((a, b) => a + b, 0) || 1;

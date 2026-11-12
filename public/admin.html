@@ -13,32 +13,19 @@
     .btn { padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; border: 1px solid transparent; font-size: 0.95rem; transition: background 0.2s; }
     .btn:active { transform: scale(0.98); }
     .btn-blue { background: #2563eb; color: white; }
-    .btn-blue:hover { background: #1d4ed8; }
     .btn-green { background: #16a34a; color: white; }
-    .btn-green:hover { background: #15803d; }
     .btn-red { background: #dc2626; color: white; }
-    .btn-red:hover { background: #b91c1c; }
     .btn-amber { background: #d97706; color: white; }
     
-    /* 題目庫捲動設計 */
-    .q-list-container {
-      max-height: 450px; /* 限制最高高度，超出時內部捲動 */
-      overflow-y: auto;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 10px;
-      background: #f8fafc;
-    }
+    .q-list-container { max-height: 450px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background: #f8fafc; }
     .q-list { list-style: none; padding: 0; margin: 0; }
-    .q-item { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; background: white; transition: all 0.2s; }
-    .q-item.active { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 10px rgba(37,99,235,0.15); border-left: 5px solid #2563eb; }
-    .q-item:last-child { margin-bottom: 0; }
+    .q-item { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; background: white; }
+    .q-item.active { border-color: #2563eb; background: #eff6ff; border-left: 5px solid #2563eb; }
   </style>
 </head>
 <body>
-  <h2>九龍工業學校65周年晚宴 - 答問後台操作系統</h2>
+  <h2>九龍工業學校65周年晚宴 - 競速問答後台系統</h2>
 
-  <!-- 1. 批量匯入 -->
   <div class="card">
     <h3>1. 批量題目導入 (CSV)</h3>
     <input type="file" id="csvFile" accept=".csv">
@@ -46,35 +33,39 @@
     <span id="loadStatus" style="margin-left: 10px; color: #16a34a; font-weight: bold;"></span>
   </div>
 
-  <!-- 2. 當前控制 -->
   <div class="card">
-    <h3>2. 流程控制器</h3>
+    <h3>2. 競速流程控制器</h3>
     <p style="margin-bottom: 15px; font-size: 1.1rem;">
       全場狀態：<b id="statusLabel" style="color:#2563eb;">IDLE</b> | 
-      目前連線人數：<b id="activeUserCount" style="color:#16a34a;">0</b>
+      連線人數：<b id="activeUserCount" style="color:#16a34a;">0</b> | 
+      倒數剩餘：<b id="timerCount" style="color:#dc2626; font-size:1.3rem;">--</b> 秒
     </p>
-    <div style="display:flex; gap:10px; flex-wrap: wrap;">
-      <button class="btn btn-green" onclick="sendCommand('OPEN_ANSWER')">▶️ 1. 開放作答</button>
-      <button class="btn btn-red" onclick="sendCommand('START_COUNTDOWN')">⏱️ 2. 最後5秒倒數 (自動公佈)</button>
-      <button class="btn btn-amber" onclick="sendCommand('SHOW_LEADERBOARD')">🏆 3. 顯示排行榜</button>
-      <a href="/api/export" class="btn btn-blue" style="text-decoration:none; display:inline-block;">📊 導出結果 Excel/CSV</a>
-      <button class="btn" style="background:#64748b; color:white; margin-left:auto;" onclick="if(confirm('警告：確認重置整場遊戲？所有分數將清零！')) sendCommand('RESET_GAME')">重置遊戲</button>
+    
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
+      <label style="font-weight:bold;">作答限時：</label>
+      <select id="durationSelect" style="padding:8px 12px; border-radius:6px; font-size:1rem; border:1px solid #cbd5e1;">
+        <option value="15">15 秒 (節奏極快)</option>
+        <option value="20" selected>20 秒 (推薦標準)</option>
+        <option value="30">30 秒 (較長思考時間)</option>
+      </select>
+
+      <button class="btn btn-green" onclick="startTimer()">▶️ 開始作答 (自動計時)</button>
+      <button class="btn btn-red" onclick="sendCommand('FORCE_STOP')">⏹️ 提前截止公佈答案</button>
+      <button class="btn btn-amber" onclick="sendCommand('SHOW_LEADERBOARD')">🏆 顯示排行榜</button>
+      <a href="/api/export" class="btn btn-blue" style="text-decoration:none;">📊 導出結果 Excel/CSV</a>
+      <button class="btn" style="background:#64748b; color:white; margin-left:auto;" onclick="if(confirm('確認重置所有分數？')) sendCommand('RESET_GAME')">重置遊戲</button>
     </div>
   </div>
 
-  <!-- 3. 題目清單 -->
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
       <h3 style="margin: 0;">3. 題目導覽庫</h3>
-      
-      <!-- 新增：上一題 / 下一題 按鈕 -->
       <div style="display:flex; gap:10px;">
         <button class="btn btn-blue" style="background:#475569;" onclick="prevQuestion()">⬅️ 上一題</button>
         <button class="btn btn-blue" style="background:#475569;" onclick="nextQuestion()">下一題 ➡️</button>
       </div>
     </div>
 
-    <!-- 增加：獨立捲動容器 -->
     <div class="q-list-container" id="qListContainer">
       <ul id="questionListView" class="q-list">
         <li style="text-align:center; padding: 20px; color: #94a3b8;">請先由上方導入 CSV 題庫</li>
@@ -87,58 +78,52 @@
     let questions = [];
     let currentIdx = -1;
 
-    // 接收狀態更新
     socket.on('state_update', (data) => {
       document.getElementById('statusLabel').innerText = data.state;
       document.getElementById('activeUserCount').innerText = data.activeCount;
+      if (data.state !== 'OPEN') {
+        document.getElementById('timerCount').innerText = '--';
+      }
     });
 
-    // 發送一般指令
+    socket.on('timer_tick', (data) => {
+      document.getElementById('timerCount').innerText = data.remaining;
+    });
+
     function sendCommand(action, index = null) {
       socket.emit('admin_command', { action, index });
     }
 
-    // 點擊或使用上一題/下一題按鈕時，選中題目
+    function startTimer() {
+      const dur = parseInt(document.getElementById('durationSelect').value);
+      socket.emit('admin_command', { action: 'START_TIMER', duration: dur });
+    }
+
     function selectQuestion(idx) {
       if (idx < 0 || idx >= questions.length) return;
       currentIdx = idx;
       
-      // 更新介面 Highlight
       document.querySelectorAll('.q-item').forEach((el, i) => {
         if (i === idx) {
           el.classList.add('active');
-          // 自動將選中的題目捲動至可見範圍內
           el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
           el.classList.remove('active');
         }
       });
-      
-      // 告訴伺服器切換至這題 (大螢幕會顯示，手機端會鎖定按鍵)
       sendCommand('PREVIEW_QUESTION', idx);
     }
 
-    // 上一題邏輯
     function prevQuestion() {
       if (questions.length === 0) return alert('請先導入題目！');
-      if (currentIdx > 0) {
-        selectQuestion(currentIdx - 1);
-      } else {
-        alert('這已經是第一題了！');
-      }
+      if (currentIdx > 0) selectQuestion(currentIdx - 1);
     }
 
-    // 下一題邏輯
     function nextQuestion() {
       if (questions.length === 0) return alert('請先導入題目！');
-      if (currentIdx < questions.length - 1) {
-        selectQuestion(currentIdx + 1);
-      } else {
-        alert('這已經是最後一題了！');
-      }
+      if (currentIdx < questions.length - 1) selectQuestion(currentIdx + 1);
     }
 
-    // 處理 CSV 匯入
     function importCSV() {
       const fileInput = document.getElementById('csvFile');
       if (!fileInput.files.length) return alert('請先選擇 CSV 檔案');
@@ -163,7 +148,7 @@
         socket.emit('import_questions', parsed, (res) => {
           if (res.success) {
             questions = parsed;
-            currentIdx = -1; // 匯入後重置當前進度
+            currentIdx = -1;
             renderQuestionList();
             document.getElementById('loadStatus').innerText = `成功載入 ${res.count} 條題目！`;
           } else {
@@ -174,7 +159,6 @@
       reader.readAsText(fileInput.files[0]);
     }
 
-    // 渲染題目清單
     function renderQuestionList() {
       const list = document.getElementById('questionListView');
       list.innerHTML = questions.map((q, idx) => `
